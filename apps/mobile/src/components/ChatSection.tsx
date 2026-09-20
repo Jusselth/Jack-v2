@@ -1,7 +1,4 @@
-import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { RecordingPresets, requestRecordingPermissionsAsync, useAudioRecorder } from 'expo-audio';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -11,27 +8,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Hexagon } from './Hexagon';
-
-export interface Message {
-  id: string;
-  sender: 'user' | 'jack';
-  text: string;
-  timestamp: string;
-  actionRoute?: string;
-  actionText?: string;
-}
-
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: '1',
-    sender: 'jack',
-    text: 'Hola. Soy Jack, tu asistente de optimización personal. ¿En qué puedo ayudarte hoy?',
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  },
-];
+import { useAppStore, ChatMessage } from '../store/useAppStore';
+import { useAssistant } from '../hooks/useAssistant';
 
 const SUGGESTIONS = [
   { label: '⚡ Optimizar gastos', query: '¿Cómo puedo optimizar mis gastos de este mes?' },
@@ -45,18 +28,14 @@ interface ChatSectionProps {
 
 export default function ChatSection({ onFocusInput }: ChatSectionProps) {
   const router = useRouter();
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const { messages, clearMessages, isTyping } = useAppStore();
+  const { state: voiceState, transcript, toggleListening, sendMessage } = useAssistant();
+
   const [expanded, setExpanded] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [isListening, setIsListening] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [transcriptStatus, setTranscriptStatus] = useState<string>('');
 
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
-  const recognitionRef = useRef<any>(null);
-  const fallbackTimerRef = useRef<any>(null);
 
   // Animations
   const expandAnim = useRef(new Animated.Value(0)).current;
@@ -66,7 +45,9 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
   const wave3Anim = useRef(new Animated.Value(0.2)).current;
   const wave4Anim = useRef(new Animated.Value(0.5)).current;
 
-  // Toggle expand with animation (Expands downwards)
+  const isListening = voiceState === 'listening';
+
+  // Toggle expand with animation
   const toggleExpand = () => {
     const toValue = expanded ? 0 : 1;
     setExpanded(!expanded);
@@ -88,12 +69,12 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
         Animated.sequence([
           Animated.timing(micPulseAnim, {
             toValue: 1.25,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(micPulseAnim, {
             toValue: 0.92,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
         ])
@@ -103,20 +84,20 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
       waveLoop = Animated.loop(
         Animated.parallel([
           Animated.sequence([
-            Animated.timing(wave1Anim, { toValue: 1, duration: 350, useNativeDriver: false }),
-            Animated.timing(wave1Anim, { toValue: 0.25, duration: 350, useNativeDriver: false }),
+            Animated.timing(wave1Anim, { toValue: 1, duration: 300, useNativeDriver: false }),
+            Animated.timing(wave1Anim, { toValue: 0.25, duration: 300, useNativeDriver: false }),
           ]),
           Animated.sequence([
-            Animated.timing(wave2Anim, { toValue: 0.2, duration: 420, useNativeDriver: false }),
-            Animated.timing(wave2Anim, { toValue: 0.95, duration: 420, useNativeDriver: false }),
+            Animated.timing(wave2Anim, { toValue: 0.2, duration: 350, useNativeDriver: false }),
+            Animated.timing(wave2Anim, { toValue: 0.95, duration: 350, useNativeDriver: false }),
           ]),
           Animated.sequence([
-            Animated.timing(wave3Anim, { toValue: 0.9, duration: 300, useNativeDriver: false }),
-            Animated.timing(wave3Anim, { toValue: 0.35, duration: 300, useNativeDriver: false }),
+            Animated.timing(wave3Anim, { toValue: 0.9, duration: 280, useNativeDriver: false }),
+            Animated.timing(wave3Anim, { toValue: 0.35, duration: 280, useNativeDriver: false }),
           ]),
           Animated.sequence([
-            Animated.timing(wave4Anim, { toValue: 0.3, duration: 480, useNativeDriver: false }),
-            Animated.timing(wave4Anim, { toValue: 1, duration: 480, useNativeDriver: false }),
+            Animated.timing(wave4Anim, { toValue: 0.3, duration: 400, useNativeDriver: false }),
+            Animated.timing(wave4Anim, { toValue: 1, duration: 400, useNativeDriver: false }),
           ]),
         ])
       );
@@ -135,151 +116,26 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
     };
   }, [isListening]);
 
-  // Clean up on unmount
+  // If new messages come in, auto-expand if collapsed and scroll down
   useEffect(() => {
-    return () => {
-      if (fallbackTimerRef.current) {
-        clearTimeout(fallbackTimerRef.current);
-      }
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // ignore
-        }
-      }
-    };
-  }, []);
-
-  // Speech Recognition & Mobile Microphone Access
-  const startSpeechRecognition = async () => {
-    if (isListening) {
-      stopSpeechRecognition();
-      return;
+    if (messages.length > 1 && !expanded) {
+      setExpanded(true);
+      Animated.timing(expandAnim, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
     }
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 150);
+  }, [messages.length]);
 
-    setTranscriptStatus('🎤 Solicitando acceso al micrófono...');
-
-    // 1. Request real microphone permission from the phone
-    try {
-      const { granted } = await requestRecordingPermissionsAsync();
-      if (!granted) {
-        setTranscriptStatus('⚠️ Permiso de micrófono denegado en el dispositivo');
-        return;
-      }
-    } catch (permErr) {
-      console.log('Perm error:', permErr);
-    }
-
-    // 2. Start real audio recording on the mobile device
-    try {
-      if (recorder) {
-        await recorder.record();
-      }
-    } catch (recErr) {
-      console.log('Recorder start error:', recErr);
-    }
-
-    setIsListening(true);
-    setTranscriptStatus('🎤 Micrófono activo en el celular... Habla ahora');
-
-    // 3. Web Speech API (Chrome, Safari, Android/iOS Web View browsers)
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (SpeechRecognition) {
-        try {
-          if (navigator?.mediaDevices?.getUserMedia) {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-          }
-
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = 'es-ES';
-
-          recognition.onstart = () => {
-            setIsListening(true);
-            setTranscriptStatus('🎤 Escuchando tu voz en vivo...');
-          };
-
-          recognition.onresult = (event: any) => {
-            let currentTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              currentTranscript += event.results[i][0].transcript;
-            }
-            if (currentTranscript.trim()) {
-              setInputText(currentTranscript);
-              setTranscriptStatus(`Transcripción: "${currentTranscript}"`);
-            }
-          };
-
-          recognition.onerror = (event: any) => {
-            console.warn('Speech recognition error:', event.error);
-            setTranscriptStatus('Audio capturado con éxito.');
-          };
-
-          recognition.onend = () => {
-            setIsListening(false);
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-          return;
-        } catch (err) {
-          console.log('Web speech error fallback:', err);
-        }
-      }
-    }
-
-    // 4. Mobile Device Speech transcription helper
-    const simulatedPhrases = [
-      'Optimizar mi presupuesto de infraestructura este mes',
-      'Revisar las tareas pendientes de alta prioridad',
-      'Generar reporte de métricas y rendimiento',
-      'Optimizar la jornada de hoy con el asistente Jack',
-    ];
-    const phrase = simulatedPhrases[Math.floor(Math.random() * simulatedPhrases.length)];
-
-    fallbackTimerRef.current = setTimeout(async () => {
-      setInputText(phrase);
-      setTranscriptStatus(`Transcrito: "${phrase}"`);
-      setIsListening(false);
-      try {
-        await recorder.stop();
-      } catch (e) {
-        // ignore
-      }
-    }, 3200);
-  };
-
-  const stopSpeechRecognition = async () => {
-    if (fallbackTimerRef.current) {
-      clearTimeout(fallbackTimerRef.current);
-    }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
-    }
-    try {
-      await recorder.stop();
-    } catch (e) {
-      // ignore
-    }
-    setIsListening(false);
-    setTranscriptStatus('');
-  };
-
-  // Send Message Logic
   const handleSend = (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query) return;
 
-    // Automatically expand downwards when sending message if collapsed
     if (!expanded) {
       setExpanded(true);
       Animated.timing(expandAnim, {
@@ -290,70 +146,22 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
       }).start();
     }
 
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: query,
-      timestamp: now,
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
     setInputText('');
-    setTranscriptStatus('');
-    if (isListening) stopSpeechRecognition();
-
-    setIsTyping(true);
-
-    setTimeout(() => {
-      let jackReply = '';
-      let actionRoute: string | undefined;
-      let actionText: string | undefined;
-
-      const lower = query.toLowerCase();
-      if (lower.includes('pendiente') || lower.includes('tarea') || lower.includes('jornada')) {
-        jackReply = 'He revisado tus pendientes. Tienes tareas de alta prioridad acumuladas hoy.';
-        actionRoute = '/pendientes';
-        actionText = 'Ver Pendientes';
-      } else if (lower.includes('gasto') || lower.includes('cuenta') || lower.includes('presupuesto')) {
-        jackReply = 'Tu consumo mensual estimado requiere optimización en instancias en la nube.';
-        actionRoute = '/cuentas';
-        actionText = 'Ver Cuentas';
-      } else {
-        jackReply = `Recibido: "${query}". He analizado tu solicitud y ajustado los parámetros de tu jornada.`;
-      }
-
-      const jackMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'jack',
-        text: jackReply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        actionRoute,
-        actionText,
-      };
-
-      setMessages((prev) => [...prev, jackMsg]);
-      setIsTyping(false);
-
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }, 1200);
+    sendMessage(query);
   };
 
   const handleSuggestionPress = (query: string) => {
-    setInputText(query);
     handleSend(query);
   };
 
   const animatedHeight = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 280],
+    outputRange: [0, 290],
   });
 
   return (
     <View style={styles.container}>
-      {/* HEADER BAR (Always visible) */}
+      {/* HEADER BAR */}
       <View style={styles.headerBar}>
         <View style={styles.headerTitleRow}>
           <MaterialCommunityIcons name="creation" size={20} color="#5DD62C" style={{ marginRight: 8 }} />
@@ -374,18 +182,19 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
         </TouchableOpacity>
       </View>
 
-      {/* EXPANDABLE CHAT BODY (Expands downwards with dedicated scroll) */}
+      {/* EXPANDABLE CHAT BODY */}
       {expanded && (
         <Animated.View style={[styles.chatBodyContainer, { height: animatedHeight }]}>
           {/* Status Sub-header */}
           <View style={styles.statusHeader}>
             <View style={styles.onlineBadge}>
               <View style={styles.greenDot} />
-              <Text style={styles.onlineText}>JACK IA Conectado</Text>
+              <Text style={styles.onlineText}>JACK IA • Conectado</Text>
             </View>
             <TouchableOpacity
-              onPress={() => setMessages(INITIAL_MESSAGES)}
+              onPress={clearMessages}
               style={styles.clearButton}
+              activeOpacity={0.7}
             >
               <MaterialIcons name="cleaning-services" size={14} color="rgba(248, 248, 248, 0.6)" />
               <Text style={styles.clearText}>Limpiar</Text>
@@ -428,10 +237,10 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
                   msg.sender === 'user' ? styles.userRow : styles.jackRow,
                 ]}
               >
-                {msg.sender === 'jack' && (
+                {msg.sender !== 'user' && (
                   <View style={styles.avatarWrap}>
                     <Hexagon size={28} fill="#337418" stroke="#5DD62C" strokeWidth={1}>
-                      <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C' }}>J</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
                     </Hexagon>
                   </View>
                 )}
@@ -442,12 +251,12 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
                     msg.sender === 'user' ? styles.userBubble : styles.jackBubble,
                   ]}
                 >
-                  <Text style={styles.messageText}>{msg.text}</Text>
+                  <Text style={styles.messageText}>{msg.content}</Text>
                   {msg.actionRoute && msg.actionText && (
                     <TouchableOpacity
                       style={styles.actionBtn}
                       activeOpacity={0.8}
-                      onPress={() => router.push(msg.actionRoute as any)}
+                      onPress={() => router.replace(msg.actionRoute as any)}
                     >
                       <Text style={styles.actionBtnText}>{msg.actionText}</Text>
                       <MaterialIcons name="arrow-forward" size={14} color="#5DD62C" />
@@ -462,7 +271,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
               <View style={[styles.messageRow, styles.jackRow]}>
                 <View style={styles.avatarWrap}>
                   <Hexagon size={28} fill="#337418" stroke="#5DD62C" strokeWidth={1}>
-                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C' }}>J</Text>
+                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
                   </Hexagon>
                 </View>
                 <View style={[styles.messageBubble, styles.jackBubble, styles.typingBubble]}>
@@ -481,7 +290,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
             <MaterialIcons name="mic" size={18} color="#0f0f0f" />
           </Animated.View>
           <View style={styles.listeningTextWrap}>
-            <Text style={styles.listeningTitle}>{transcriptStatus || 'Escuchando tu voz en el celular...'}</Text>
+            <Text style={styles.listeningTitle}>{transcript ? `"${transcript}"` : 'Escuchando tu voz...'}</Text>
             <View style={styles.waveBarRow}>
               <Animated.View style={[styles.waveBar, { height: wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [4, 18] }) }]} />
               <Animated.View style={[styles.waveBar, { height: wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [4, 18] }) }]} />
@@ -490,7 +299,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
               <Animated.View style={[styles.waveBar, { height: wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [4, 18] }) }]} />
             </View>
           </View>
-          <TouchableOpacity style={styles.stopMicBtn} onPress={stopSpeechRecognition}>
+          <TouchableOpacity style={styles.stopMicBtn} onPress={toggleListening}>
             <MaterialIcons name="stop" size={18} color="#f8f8f8" />
           </TouchableOpacity>
         </View>
@@ -517,7 +326,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
         <TouchableOpacity
           style={[styles.iconButton, isListening && styles.micActiveButton]}
           activeOpacity={0.75}
-          onPress={startSpeechRecognition}
+          onPress={toggleListening}
         >
           <Animated.View style={{ transform: [{ scale: isListening ? micPulseAnim : 1 }] }}>
             <MaterialIcons
@@ -546,25 +355,22 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#0f0f0f', // Fondo Negro
-    borderTopWidth: 2,           // Borde Superior Verde
-    borderBottomWidth: 2,        // Borde Inferior Verde
+    backgroundColor: '#0f0f0f',
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
     borderTopColor: '#5DD62C',
     borderBottomColor: '#5DD62C',
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginTop: 38,               // Mayor separación de la J
+    marginTop: 28,
     marginBottom: 16,
-
-    // Glow Neón Verde
     shadowColor: '#5DD62C',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 10,
   },
-
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -596,12 +402,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(93, 214, 44, 0.4)',
   },
   expandText: {
+    fontFamily: 'Demonized',
     fontSize: 11,
     fontWeight: '700',
     color: '#5DD62C',
     marginRight: 2,
   },
-
   chatBodyContainer: {
     overflow: 'hidden',
     borderTopWidth: 1,
@@ -619,59 +425,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
     backgroundColor: '#5DD62C',
     marginRight: 6,
+    shadowColor: '#5DD62C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
   },
   onlineText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontFamily: 'Demonized',
+    fontSize: 11,
     color: '#5DD62C',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
   },
   clearText: {
+    fontFamily: 'Demonized',
     fontSize: 10,
     color: 'rgba(248, 248, 248, 0.6)',
   },
-
   suggestionsContainer: {
     gap: 8,
-    paddingVertical: 4,
-    marginBottom: 6,
+    paddingBottom: 8,
   },
   chip: {
-    backgroundColor: '#202020',
+    backgroundColor: 'rgba(51, 116, 24, 0.25)',
     borderWidth: 1,
-    borderColor: 'rgba(93, 214, 44, 0.3)',
-    borderRadius: 16,
+    borderColor: 'rgba(93, 214, 44, 0.5)',
+    borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   chipText: {
-    fontSize: 11,
+    fontSize: 12,
+    color: '#5DD62C',
     fontWeight: '600',
-    color: '#f8f8f8',
   },
-
   messagesList: {
     flex: 1,
+    maxHeight: 180,
     marginVertical: 4,
   },
   messagesContent: {
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+    gap: 8,
+    paddingBottom: 4,
   },
   messageRow: {
     flexDirection: 'row',
-    marginVertical: 4,
     alignItems: 'flex-end',
+    gap: 8,
   },
   userRow: {
     justifyContent: 'flex-end',
@@ -680,65 +491,63 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   avatarWrap: {
-    marginRight: 8,
     marginBottom: 2,
   },
   messageBubble: {
-    maxWidth: '80%',
-    borderRadius: 12,
+    maxWidth: '82%',
     paddingHorizontal: 12,
     paddingVertical: 8,
+    borderRadius: 14,
   },
   userBubble: {
-    backgroundColor: '#202020',
+    backgroundColor: '#337418',
+    borderBottomRightRadius: 2,
     borderWidth: 1,
     borderColor: '#5DD62C',
-    borderBottomRightRadius: 2,
   },
   jackBubble: {
-    backgroundColor: '#161616',
+    backgroundColor: '#202020',
+    borderBottomLeftRadius: 2,
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.4)',
-    borderBottomLeftRadius: 2,
-  },
-  typingBubble: {
-    paddingVertical: 6,
   },
   messageText: {
     fontSize: 13,
     color: '#f8f8f8',
     lineHeight: 18,
   },
-  typingText: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    color: '#5DD62C',
-  },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    backgroundColor: '#202020',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(51, 116, 24, 0.4)',
     borderWidth: 1,
     borderColor: '#5DD62C',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 6,
   },
   actionBtnText: {
+    fontFamily: 'Demonized',
     fontSize: 11,
-    fontWeight: '700',
     color: '#5DD62C',
+    fontWeight: '700',
   },
   timestampText: {
     fontSize: 9,
-    color: 'rgba(248, 248, 248, 0.4)',
-    alignSelf: 'flex-end',
+    color: 'rgba(248, 248, 248, 0.45)',
     marginTop: 4,
+    alignSelf: 'flex-end',
   },
-
+  typingBubble: {
+    paddingVertical: 6,
+  },
+  typingText: {
+    fontSize: 12,
+    color: '#5DD62C',
+    fontStyle: 'italic',
+  },
   listeningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -749,6 +558,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginVertical: 6,
+    gap: 8,
   },
   micPulseCircle: {
     width: 28,
@@ -757,22 +567,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#5DD62C',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
   listeningTextWrap: {
     flex: 1,
   },
   listeningTitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#5DD62C',
+    color: '#f8f8f8',
   },
   waveBarRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 3,
     marginTop: 4,
-    height: 18,
   },
   waveBar: {
     width: 3,
@@ -780,35 +588,34 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   stopMicBtn: {
-    backgroundColor: '#337418',
+    backgroundColor: '#ef4444',
     padding: 6,
-    borderRadius: 6,
+    borderRadius: 8,
   },
-
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 6,
+    paddingTop: 8,
   },
   textInput: {
     flex: 1,
+    height: 42,
     backgroundColor: '#202020',
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.4)',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     color: '#f8f8f8',
     fontSize: 13,
   },
   iconButton: {
-    width: 38,
-    height: 38,
+    width: 42,
+    height: 42,
     borderRadius: 10,
     backgroundColor: '#202020',
     borderWidth: 1,
-    borderColor: 'rgba(93, 214, 44, 0.5)',
+    borderColor: 'rgba(93, 214, 44, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },

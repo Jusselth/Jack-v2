@@ -12,13 +12,13 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ state, onPress, disabl
   const getButtonContent = () => {
     switch (state) {
       case 'listening':
-        return { label: 'Escuchando...', bg: '#ef4444', icon: '🔴' };
+        return { label: 'ESCUCHANDO...', bg: '#ef4444', icon: '🔴' };
       case 'processing':
-        return { label: 'Pensando...', bg: '#8b5cf6', icon: '⏳' };
+        return { label: 'PENSANDO...', bg: '#8b5cf6', icon: '⏳' };
       case 'speaking':
-        return { label: 'Hablando...', bg: '#10b981', icon: '🔊' };
+        return { label: 'HABLANDO...', bg: '#10b981', icon: '🔊' };
       default:
-        return { label: 'Tocar para hablar', bg: '#3b82f6', icon: '🎙️' };
+        return { label: 'TOCAR PARA HABLAR', bg: '#337418', icon: '🎙️' };
     }
   };
 
@@ -46,10 +46,12 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    borderWidth: 1.5,
+    borderColor: '#5DD62C',
+    shadowColor: '#5DD62C',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
     elevation: 8,
   },
   content: {
@@ -58,11 +60,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   icon: {
-    fontSize: 18,
+    fontSize: 16,
   },
   label: {
-    color: '#ffffff',
-    fontSize: 16,
+    fontFamily: 'Demonized',
+    color: '#f8f8f8',
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: 0.8,
   },
 });
