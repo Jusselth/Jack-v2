@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Jack Assistant",
+    "slug": "jack-v2",
+    "scheme": "jack-assistant",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#09090b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Permite a Jack escuchar tus comandos de voz para gestionar tareas y finanzas.",
+        "NSMicrophoneUsageDescription": "Permite a Jack usar el micrófono para interactuar por voz."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#09090b"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permite a Jack acceder a tu micrófono para el asistente de voz.",
+          "speechRecognitionPermission": "Permite a Jack transcribir tus comandos de voz."
+        }
+      ]
+    ]
+  }
+}

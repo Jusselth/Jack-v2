@@ -1,22 +1,26 @@
 {
-  "name": "jack-v2",
+  "name": "ai-assistant-monorepo",
   "version": "1.0.0",
-  "main": "index.ts",
-  "dependencies": {
-    "expo": "~57.0.24",
-    "expo-status-bar": "~57.0.1",
-    "react": "19.2.3",
-    "react-native": "0.86.3"
-  },
-  "devDependencies": {
-    "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
-  },
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "backend:dev": "npm run dev --workspace=backend",
+    "backend:build": "npm run build --workspace=backend",
+    "backend:start": "npm run start --workspace=backend",
+    "mobile:start": "npm run start --workspace=mobile",
+    "mobile:android": "npm run android --workspace=mobile",
+    "mobile:ios": "npm run ios --workspace=mobile",
+    "mobile:web": "npm run web --workspace=mobile"
   },
-  "private": true
+  "keywords": [
+    "ai-assistant",
+    "expo",
+    "express",
+    "local-llm",
+    "supabase"
+  ],
+  "author": "",
+  "license": "MIT"
 }
