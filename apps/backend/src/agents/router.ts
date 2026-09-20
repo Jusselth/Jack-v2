@@ -9,18 +9,55 @@ interface RouteResult {
 }
 
 export async function classifyIntent(userMessage: string): Promise<RouteResult> {
+  const normalized = userMessage
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Clasificación heurística instantánea de alta confianza
+  const isSecretary =
+    normalized.includes('tarea') ||
+    normalized.includes('pendiente') ||
+    normalized.includes('recordar') ||
+    normalized.includes('recuerd') ||
+    normalized.includes('agenda') ||
+    normalized.includes('nota') ||
+    normalized.includes('reunion') ||
+    normalized.includes('evento') ||
+    normalized.includes('anota');
+
+  const isFinancial =
+    normalized.includes('plata') ||
+    normalized.includes('gasto') ||
+    normalized.includes('saldo') ||
+    normalized.includes('cuanto tengo') ||
+    normalized.includes('compre') ||
+    normalized.includes('compra') ||
+    normalized.includes('pague') ||
+    normalized.includes('pago') ||
+    normalized.includes('transferencia') ||
+    normalized.includes('nequi') ||
+    normalized.includes('bancolombia') ||
+    normalized.includes('daviplata') ||
+    normalized.includes('dinero') ||
+    normalized.includes('cuenta') ||
+    normalized.includes('presupuesto');
+
+  // 2. Consulta al LLM local con timeout rápido de 2500ms
   try {
-    const response = await localLLM.chat.completions.create({
-      model: LLM_MODEL,
-      messages: [
-        { role: 'system', content: ROUTER_SYSTEM_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.1,
-    });
+    const response = await localLLM.chat.completions.create(
+      {
+        model: LLM_MODEL,
+        messages: [
+          { role: 'system', content: ROUTER_SYSTEM_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0.1,
+      },
+      { timeout: 2500 }
+    );
 
     const content = response.choices[0]?.message?.content?.trim() || '';
-    // Intenta parsear JSON
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
@@ -29,17 +66,17 @@ export async function classifyIntent(userMessage: string): Promise<RouteResult> 
       }
     }
   } catch (error) {
-    console.error('Error in intent classification with LLM:', error);
+    // Si el LLM local está offline o tarda más de 2.5s, usamos el clasificador heurístico
   }
 
-  // Fallback heurístico si el LLM local falla o no responde JSON
-  const lower = userMessage.toLowerCase();
-  if (lower.includes('tarea') || lower.includes('pendiente') || lower.includes('recordar') || lower.includes('agenda')) {
-    return { agent: 'secretary', reasoning: 'Keyword fallback' };
+  // Fallback heurístico optimizado
+  if (isSecretary) {
+    return { agent: 'secretary', reasoning: 'Keyword heuristic match' };
   }
-  if (lower.includes('plata') || lower.includes('gasto') || lower.includes('saldo') || lower.includes('cuanto tengo') || lower.includes('compre') || lower.includes('transferencia') || lower.includes('nequi') || lower.includes('bancolombia')) {
-    return { agent: 'financial', reasoning: 'Keyword fallback' };
+  if (isFinancial) {
+    return { agent: 'financial', reasoning: 'Keyword heuristic match' };
   }
 
   return { agent: 'general', reasoning: 'Default fallback' };
 }
+

@@ -63,6 +63,7 @@ interface AppState {
   tasks: TaskItem[];
   setTasks: (tasks: TaskItem[]) => void;
   addTask: (task: Omit<TaskItem, 'id' | 'created_at'>) => void;
+  updateTask: (taskId: string, updates: Partial<TaskItem>) => void;
   toggleTaskStatus: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
 
@@ -159,6 +160,10 @@ export const useAppStore = create<AppState>((set) => ({
         },
         ...state.tasks,
       ],
+    })),
+  updateTask: (taskId, updates) =>
+    set((state) => ({
+      tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
     })),
   toggleTaskStatus: (taskId) =>
     set((state) => ({

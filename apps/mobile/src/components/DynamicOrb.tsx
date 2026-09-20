@@ -1,14 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-  Easing,
-  interpolateColor,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { VoiceState } from '../hooks/useVoiceEngine';
 
 interface DynamicOrbProps {
@@ -17,279 +8,314 @@ interface DynamicOrbProps {
 }
 
 export const DynamicOrb: React.FC<DynamicOrbProps> = ({ state, size = 180 }) => {
-  const coreScale = useSharedValue(1);
-  const auraScale = useSharedValue(1);
-  const outerRingScale = useSharedValue(1);
-  const rotation = useSharedValue(0);
-  const colorProgress = useSharedValue(0);
-  const auraOpacity = useSharedValue(0.6);
+  // Core sphere animation values
+  const coreScale = useRef(new Animated.Value(1)).current;
+  const coreGlowScale = useRef(new Animated.Value(1)).current;
+  const rotation = useRef(new Animated.Value(0)).current;
+  const colorProgress = useRef(new Animated.Value(0)).current;
+
+  // 3 Concentric Siri-style Ripple Wave Rings
+  const wave1Scale = useRef(new Animated.Value(1)).current;
+  const wave1Opacity = useRef(new Animated.Value(0.7)).current;
+
+  const wave2Scale = useRef(new Animated.Value(1)).current;
+  const wave2Opacity = useRef(new Animated.Value(0.7)).current;
+
+  const wave3Scale = useRef(new Animated.Value(1)).current;
+  const wave3Opacity = useRef(new Animated.Value(0.7)).current;
+
+  const currentLoop = useRef<Animated.CompositeAnimation | null>(null);
+  const spinLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    // 0: idle (green #5DD62C), 1: listening (red/amber #ef4444), 2: processing (purple #8b5cf6), 3: speaking (emerald #10b981)
-    switch (state) {
-      case 'idle':
-        colorProgress.value = withTiming(0, { duration: 500 });
-        auraOpacity.value = withTiming(0.45, { duration: 500 });
+    if (currentLoop.current) currentLoop.current.stop();
+    if (spinLoop.current) spinLoop.current.stop();
 
-        // Slow, subtle ambient breathing (1800ms loop, 1.05x)
-        coreScale.value = withRepeat(
-          withSequence(
-            withTiming(1.05, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.95, { duration: 1800, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
+    let targetColor = 0;
+    let waveDuration = 2400;
+    let coreDuration = 1800;
+    let maxWaveScale = 1.9;
+    let spinDuration = 16000;
 
-        auraScale.value = withRepeat(
-          withSequence(
-            withTiming(1.15, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.9, { duration: 2200, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        outerRingScale.value = withRepeat(
-          withSequence(
-            withTiming(1.25, { duration: 2600, easing: Easing.inOut(Easing.ease) }),
-            withTiming(1.0, { duration: 2600, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        rotation.value = withRepeat(
-          withTiming(360, { duration: 24000, easing: Easing.linear }),
-          -1,
-          false
-        );
-        break;
-
-      case 'listening':
-        colorProgress.value = withTiming(1, { duration: 250 });
-        auraOpacity.value = withTiming(0.85, { duration: 250 });
-
-        // Rapid fast pulsing (500ms loop, 1.25x scale)
-        coreScale.value = withRepeat(
-          withSequence(
-            withTiming(1.25, { duration: 500, easing: Easing.out(Easing.ease) }),
-            withTiming(0.9, { duration: 500, easing: Easing.in(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        auraScale.value = withRepeat(
-          withSequence(
-            withTiming(1.45, { duration: 500, easing: Easing.out(Easing.ease) }),
-            withTiming(0.95, { duration: 500, easing: Easing.in(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        outerRingScale.value = withRepeat(
-          withSequence(
-            withTiming(1.6, { duration: 600, easing: Easing.out(Easing.ease) }),
-            withTiming(1.05, { duration: 600, easing: Easing.in(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        rotation.value = withRepeat(
-          withTiming(360, { duration: 6000, easing: Easing.linear }),
-          -1,
-          false
-        );
-        break;
-
-      case 'processing':
-        colorProgress.value = withTiming(2, { duration: 300 });
-        auraOpacity.value = withTiming(0.75, { duration: 300 });
-
-        // Rapid spinning and pulsation frequency
-        coreScale.value = withRepeat(
-          withSequence(
-            withTiming(1.12, { duration: 400, easing: Easing.inOut(Easing.quad) }),
-            withTiming(0.96, { duration: 400, easing: Easing.inOut(Easing.quad) })
-          ),
-          -1,
-          true
-        );
-
-        auraScale.value = withRepeat(
-          withSequence(
-            withTiming(1.3, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.98, { duration: 700, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        outerRingScale.value = withRepeat(
-          withSequence(
-            withTiming(1.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
-            withTiming(1.05, { duration: 800, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        rotation.value = withRepeat(
-          withTiming(360, { duration: 1200, easing: Easing.linear }),
-          -1,
-          false
-        );
-        break;
-
-      case 'speaking':
-        colorProgress.value = withTiming(3, { duration: 300 });
-        auraOpacity.value = withTiming(0.8, { duration: 300 });
-
-        // Fluid rhythmic dynamic pulse (600ms loop, 1.18x scale)
-        coreScale.value = withRepeat(
-          withSequence(
-            withTiming(1.18, { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }),
-            withTiming(0.98, { duration: 300, easing: Easing.bezier(0.25, 0.1, 0.25, 1) })
-          ),
-          -1,
-          true
-        );
-
-        auraScale.value = withRepeat(
-          withSequence(
-            withTiming(1.38, { duration: 350, easing: Easing.inOut(Easing.ease) }),
-            withTiming(0.95, { duration: 350, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        outerRingScale.value = withRepeat(
-          withSequence(
-            withTiming(1.5, { duration: 400, easing: Easing.inOut(Easing.ease) }),
-            withTiming(1.0, { duration: 400, easing: Easing.inOut(Easing.ease) })
-          ),
-          -1,
-          true
-        );
-
-        rotation.value = withRepeat(
-          withTiming(360, { duration: 8000, easing: Easing.linear }),
-          -1,
-          false
-        );
-        break;
+    if (state === 'idle') {
+      targetColor = 0;
+      waveDuration = 2600;
+      coreDuration = 1800;
+      maxWaveScale = 1.7;
+      spinDuration = 16000;
+    } else if (state === 'listening') {
+      targetColor = 1;
+      waveDuration = 1200;
+      coreDuration = 600;
+      maxWaveScale = 2.3;
+      spinDuration = 4000;
+    } else if (state === 'processing') {
+      targetColor = 2;
+      waveDuration = 900;
+      coreDuration = 450;
+      maxWaveScale = 2.1;
+      spinDuration = 1500;
+    } else if (state === 'speaking') {
+      targetColor = 3;
+      waveDuration = 1400;
+      coreDuration = 500;
+      maxWaveScale = 2.2;
+      spinDuration = 6000;
     }
+
+    // Color transition
+    Animated.timing(colorProgress, {
+      toValue: targetColor,
+      duration: 350,
+      useNativeDriver: false,
+    }).start();
+
+    // Helper for creating continuous ripple waves
+    const createWaveLoop = (scaleAnim: Animated.Value, opacityAnim: Animated.Value, delay: number) => {
+      return Animated.sequence([
+        Animated.delay(delay),
+        Animated.loop(
+          Animated.parallel([
+            Animated.sequence([
+              Animated.timing(scaleAnim, {
+                toValue: 1,
+                duration: 0,
+                useNativeDriver: false,
+              }),
+              Animated.timing(scaleAnim, {
+                toValue: maxWaveScale,
+                duration: waveDuration,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: false,
+              }),
+            ]),
+            Animated.sequence([
+              Animated.timing(opacityAnim, {
+                toValue: 0.75,
+                duration: 0,
+                useNativeDriver: false,
+              }),
+              Animated.timing(opacityAnim, {
+                toValue: 0,
+                duration: waveDuration,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: false,
+              }),
+            ]),
+          ])
+        ),
+      ]);
+    };
+
+    // Core breathing pulsation
+    const coreBreathing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(coreScale, {
+          toValue: state === 'listening' ? 1.2 : state === 'speaking' ? 1.15 : 1.06,
+          duration: coreDuration,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(coreScale, {
+          toValue: 0.96,
+          duration: coreDuration,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    const glowPulsing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(coreGlowScale, {
+          toValue: 1.25,
+          duration: coreDuration,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(coreGlowScale, {
+          toValue: 0.92,
+          duration: coreDuration,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+
+    currentLoop.current = Animated.parallel([
+      coreBreathing,
+      glowPulsing,
+      createWaveLoop(wave1Scale, wave1Opacity, 0),
+      createWaveLoop(wave2Scale, wave2Opacity, waveDuration * 0.33),
+      createWaveLoop(wave3Scale, wave3Opacity, waveDuration * 0.66),
+    ]);
+    currentLoop.current.start();
+
+    // Constant smooth rotation for iridescent orb
+    rotation.setValue(0);
+    spinLoop.current = Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: spinDuration,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      })
+    );
+    spinLoop.current.start();
+
+    return () => {
+      currentLoop.current?.stop();
+      spinLoop.current?.stop();
+    };
   }, [state]);
 
-  const animatedCoreStyle = useAnimatedStyle(() => {
-    const color = interpolateColor(
-      colorProgress.value,
-      [0, 1, 2, 3],
-      ['#5DD62C', '#ef4444', '#8b5cf6', '#10b981']
-    );
-
-    return {
-      transform: [
-        { scale: coreScale.value },
-        { rotate: `${rotation.value}deg` },
-      ],
-      backgroundColor: color,
-      shadowColor: color,
-    };
+  // Color interpolations: 0: Idle (Electric Green/Cyan), 1: Listening (Siri Magenta/Amber), 2: Processing (Deep Violet), 3: Speaking (Cyan/Emerald)
+  const coreBgColor = colorProgress.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: ['#5DD62C', '#ec4899', '#8b5cf6', '#06b6d4'],
   });
 
-  const animatedAuraStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      colorProgress.value,
-      [0, 1, 2, 3],
-      ['rgba(93, 214, 44, 0.65)', 'rgba(239, 68, 68, 0.75)', 'rgba(139, 92, 246, 0.75)', 'rgba(16, 185, 129, 0.75)']
-    );
-    const glowColor = interpolateColor(
-      colorProgress.value,
-      [0, 1, 2, 3],
-      ['#5DD62C', '#ef4444', '#8b5cf6', '#10b981']
-    );
-
-    return {
-      transform: [{ scale: auraScale.value }],
-      borderColor,
-      opacity: auraOpacity.value,
-      shadowColor: glowColor,
-    };
+  const secondaryColor = colorProgress.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: ['#337418', '#ef4444', '#6366f1', '#10b981'],
   });
 
-  const animatedOuterRingStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      colorProgress.value,
-      [0, 1, 2, 3],
-      ['rgba(93, 214, 44, 0.35)', 'rgba(239, 68, 68, 0.45)', 'rgba(139, 92, 246, 0.45)', 'rgba(16, 185, 129, 0.45)']
-    );
-
-    return {
-      transform: [
-        { scale: outerRingScale.value },
-        { rotate: `-${rotation.value * 0.7}deg` },
-      ],
-      borderColor,
-    };
+  const waveColor = colorProgress.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: [
+      'rgba(93, 214, 44, 0.45)',
+      'rgba(236, 72, 153, 0.55)',
+      'rgba(139, 92, 246, 0.55)',
+      'rgba(6, 182, 212, 0.55)',
+    ],
   });
 
-  const coreSize = size * 0.62;
-  const auraSize = size * 0.88;
-  const outerSize = size * 1.15;
+  const glowShadowColor = colorProgress.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: ['#5DD62C', '#ec4899', '#8b5cf6', '#06b6d4'],
+  });
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const coreSize = size * 0.65;
+  const waveBaseSize = coreSize;
 
   return (
-    <View style={[styles.container, { width: size * 1.3, height: size * 1.3 }]}>
-      {/* Outer Glow Ring */}
+    <View style={[styles.container, { width: size * 1.5, height: size * 1.5 }]}>
+      {/* ── CONCENTRIC WAVE RIPPLE 3 ── */}
       <Animated.View
+        pointerEvents="none"
         style={[
-          styles.outerRing,
+          styles.waveRing,
           {
-            width: outerSize,
-            height: outerSize,
-            borderRadius: outerSize / 2,
+            width: waveBaseSize,
+            height: waveBaseSize,
+            borderRadius: waveBaseSize / 2,
+            borderColor: waveColor,
+            opacity: wave3Opacity,
+            transform: [{ scale: wave3Scale }],
           },
-          animatedOuterRingStyle,
         ]}
       />
 
-      {/* Mid Aura Ring */}
+      {/* ── CONCENTRIC WAVE RIPPLE 2 ── */}
       <Animated.View
+        pointerEvents="none"
         style={[
-          styles.auraRing,
+          styles.waveRing,
           {
-            width: auraSize,
-            height: auraSize,
-            borderRadius: auraSize / 2,
+            width: waveBaseSize,
+            height: waveBaseSize,
+            borderRadius: waveBaseSize / 2,
+            borderColor: waveColor,
+            opacity: wave2Opacity,
+            transform: [{ scale: wave2Scale }],
           },
-          animatedAuraStyle,
         ]}
       />
 
-      {/* Minimalist Glowing Core */}
+      {/* ── CONCENTRIC WAVE RIPPLE 1 ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.waveRing,
+          {
+            width: waveBaseSize,
+            height: waveBaseSize,
+            borderRadius: waveBaseSize / 2,
+            borderColor: waveColor,
+            opacity: wave1Opacity,
+            transform: [{ scale: wave1Scale }],
+          },
+        ]}
+      />
+
+      {/* ── OUTER AURA GLOW ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.outerAura,
+          {
+            width: coreSize * 1.35,
+            height: coreSize * 1.35,
+            borderRadius: (coreSize * 1.35) / 2,
+            backgroundColor: waveColor,
+            shadowColor: glowShadowColor,
+            transform: [{ scale: coreGlowScale }],
+          },
+        ]}
+      />
+
+      {/* ── SIRI-STYLE IRIDESCENT CORE SPHERE ── */}
       <Animated.View
         style={[
-          styles.core,
+          styles.coreSphere,
           {
             width: coreSize,
             height: coreSize,
             borderRadius: coreSize / 2,
+            backgroundColor: coreBgColor,
+            shadowColor: glowShadowColor,
+            transform: [{ scale: coreScale }, { rotate: spin }],
           },
-          animatedCoreStyle,
         ]}
       >
-        {/* Inner core specular highlight */}
+        {/* Layered inner gradient nebula effect */}
+        <Animated.View
+          style={[
+            styles.innerNebula,
+            {
+              width: coreSize * 0.85,
+              height: coreSize * 0.85,
+              borderRadius: (coreSize * 0.85) / 2,
+              backgroundColor: secondaryColor,
+            },
+          ]}
+        />
+
+        {/* Specular light crest */}
         <View
           style={[
-            styles.innerHighlight,
+            styles.specularCrest,
             {
-              width: coreSize * 0.45,
-              height: coreSize * 0.45,
-              borderRadius: (coreSize * 0.45) / 2,
+              width: coreSize * 0.42,
+              height: coreSize * 0.28,
+              borderRadius: coreSize * 0.2,
+            },
+          ]}
+        />
+
+        {/* Center core pinpoint highlight */}
+        <View
+          style={[
+            styles.centerPinpoint,
+            {
+              width: coreSize * 0.22,
+              height: coreSize * 0.22,
+              borderRadius: (coreSize * 0.22) / 2,
             },
           ]}
         />
@@ -304,34 +330,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  outerRing: {
-    position: 'absolute',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    backgroundColor: 'transparent',
-  },
-  auraRing: {
+  waveRing: {
     position: 'absolute',
     borderWidth: 2,
     backgroundColor: 'transparent',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 28,
-    elevation: 14,
+    shadowOpacity: 0.8,
+    shadowRadius: 14,
+    elevation: 6,
   },
-  core: {
+  outerAura: {
+    position: 'absolute',
+    opacity: 0.4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 36,
+    elevation: 16,
+  },
+  coreSphere: {
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.95,
-    shadowRadius: 36,
-    elevation: 24,
+    shadowOpacity: 1,
+    shadowRadius: 32,
+    elevation: 20,
+    overflow: 'hidden',
   },
-  innerHighlight: {
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+  innerNebula: {
+    position: 'absolute',
+    opacity: 0.65,
+    top: '10%',
+    left: '10%',
+  },
+  specularCrest: {
+    position: 'absolute',
+    top: '12%',
+    left: '20%',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
+    transform: [{ rotate: '-25deg' }],
+  },
+  centerPinpoint: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     shadowColor: '#ffffff',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

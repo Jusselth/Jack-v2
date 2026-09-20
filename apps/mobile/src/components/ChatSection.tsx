@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,10 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Hexagon } from './Hexagon';
-import { useAppStore, ChatMessage } from '../store/useAppStore';
+import { useAppStore } from '../store/useAppStore';
 import { useAssistant } from '../hooks/useAssistant';
 
 const SUGGESTIONS = [
@@ -53,7 +55,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
     setExpanded(!expanded);
     Animated.timing(expandAnim, {
       toValue,
-      duration: 320,
+      duration: 300,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
@@ -116,13 +118,33 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
     };
   }, [isListening]);
 
+  // Sync live transcription into the TextInput in real-time
+  useEffect(() => {
+    if (transcript && transcript.trim()) {
+      setInputText(transcript);
+    }
+  }, [transcript]);
+
+  // When voice stops listening, focus text input so user can edit or send
+  const prevListeningRef = useRef(isListening);
+  useEffect(() => {
+    if (prevListeningRef.current && !isListening) {
+      if (inputText.trim()) {
+        setTimeout(() => {
+          textInputRef.current?.focus();
+        }, 150);
+      }
+    }
+    prevListeningRef.current = isListening;
+  }, [isListening, inputText]);
+
   // If new messages come in, auto-expand if collapsed and scroll down
   useEffect(() => {
     if (messages.length > 1 && !expanded) {
       setExpanded(true);
       Animated.timing(expandAnim, {
         toValue: 1,
-        duration: 320,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
@@ -140,15 +162,17 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
       setExpanded(true);
       Animated.timing(expandAnim, {
         toValue: 1,
-        duration: 320,
+        duration: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
     }
 
     setInputText('');
+    useAppStore.getState().setTranscript('');
     sendMessage(query);
   };
+
 
   const handleSuggestionPress = (query: string) => {
     handleSend(query);
@@ -156,7 +180,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
 
   const animatedHeight = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 290],
+    outputRange: [0, 260],
   });
 
   return (
@@ -164,8 +188,8 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
       {/* HEADER BAR */}
       <View style={styles.headerBar}>
         <View style={styles.headerTitleRow}>
-          <MaterialCommunityIcons name="creation" size={20} color="#5DD62C" style={{ marginRight: 8 }} />
-          <Text style={styles.titleText}>¿En qué puedo optimizar tu jornada hoy?</Text>
+          <MaterialCommunityIcons name="creation" size={18} color="#5DD62C" style={{ marginRight: 6 }} />
+          <Text style={styles.titleText}>¿En qué puedo optimizar tu jornada?</Text>
         </View>
 
         <TouchableOpacity
@@ -176,7 +200,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
           <Text style={styles.expandText}>{expanded ? 'Plegar' : 'Expandir'}</Text>
           <MaterialIcons
             name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
-            size={22}
+            size={20}
             color="#5DD62C"
           />
         </TouchableOpacity>
@@ -189,15 +213,15 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
           <View style={styles.statusHeader}>
             <View style={styles.onlineBadge}>
               <View style={styles.greenDot} />
-              <Text style={styles.onlineText}>JACK IA • Conectado</Text>
+              <Text style={styles.onlineText}>JACK IA • CONECTADO</Text>
             </View>
             <TouchableOpacity
               onPress={clearMessages}
               style={styles.clearButton}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="cleaning-services" size={14} color="rgba(248, 248, 248, 0.6)" />
-              <Text style={styles.clearText}>Limpiar</Text>
+              <MaterialIcons name="cleaning-services" size={13} color="rgba(248, 248, 248, 0.6)" />
+              <Text style={styles.clearText}>LIMPIAR</Text>
             </TouchableOpacity>
           </View>
 
@@ -240,7 +264,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
                 {msg.sender !== 'user' && (
                   <View style={styles.avatarWrap}>
                     <Hexagon size={28} fill="#337418" stroke="#5DD62C" strokeWidth={1}>
-                      <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
+                      <Text style={styles.avatarLetter}>J</Text>
                     </Hexagon>
                   </View>
                 )}
@@ -271,11 +295,11 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
               <View style={[styles.messageRow, styles.jackRow]}>
                 <View style={styles.avatarWrap}>
                   <Hexagon size={28} fill="#337418" stroke="#5DD62C" strokeWidth={1}>
-                    <Text style={{ fontSize: 13, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
+                    <Text style={styles.avatarLetter}>J</Text>
                   </Hexagon>
                 </View>
                 <View style={[styles.messageBubble, styles.jackBubble, styles.typingBubble]}>
-                  <Text style={styles.typingText}>Jack está analizando...</Text>
+                  <Text style={styles.typingText}>Jack está procesando...</Text>
                 </View>
               </View>
             )}
@@ -290,7 +314,7 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
             <MaterialIcons name="mic" size={18} color="#0f0f0f" />
           </Animated.View>
           <View style={styles.listeningTextWrap}>
-            <Text style={styles.listeningTitle}>{transcript ? `"${transcript}"` : 'Escuchando tu voz...'}</Text>
+            <Text style={styles.listeningTitle}>{transcript || 'Escuchando tu micrófono...'}</Text>
             <View style={styles.waveBarRow}>
               <Animated.View style={[styles.waveBar, { height: wave1Anim.interpolate({ inputRange: [0, 1], outputRange: [4, 18] }) }]} />
               <Animated.View style={[styles.waveBar, { height: wave2Anim.interpolate({ inputRange: [0, 1], outputRange: [4, 18] }) }]} />
@@ -310,11 +334,12 @@ export default function ChatSection({ onFocusInput }: ChatSectionProps) {
         <TextInput
           ref={textInputRef}
           style={styles.textInput}
-          placeholder="Escribe o habla por el micrófono..."
+          placeholder="Escribe o habla con Jack..."
           placeholderTextColor="rgba(248, 248, 248, 0.4)"
           value={inputText}
           onChangeText={setInputText}
           onFocus={() => {
+            if (!expanded) toggleExpand();
             if (onFocusInput) onFocusInput();
           }}
           onSubmitEditing={() => handleSend()}
@@ -360,10 +385,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderTopColor: '#5DD62C',
     borderBottomColor: '#5DD62C',
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginTop: 28,
+    marginTop: 16,
     marginBottom: 16,
     shadowColor: '#5DD62C',
     shadowOffset: { width: 0, height: 0 },
@@ -385,7 +410,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontFamily: 'Demonized',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#f8f8f8',
     letterSpacing: -0.3,
@@ -403,7 +428,7 @@ const styles = StyleSheet.create({
   },
   expandText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#5DD62C',
     marginRight: 2,
@@ -425,9 +450,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greenDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#5DD62C',
     marginRight: 6,
     shadowColor: '#5DD62C',
@@ -437,9 +462,10 @@ const styles = StyleSheet.create({
   },
   onlineText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     color: '#5DD62C',
     fontWeight: '600',
+    letterSpacing: 0.6,
   },
   clearButton: {
     flexDirection: 'row',
@@ -450,8 +476,9 @@ const styles = StyleSheet.create({
   },
   clearText: {
     fontFamily: 'Demonized',
-    fontSize: 10,
+    fontSize: 9,
     color: 'rgba(248, 248, 248, 0.6)',
+    letterSpacing: 0.6,
   },
   suggestionsContainer: {
     gap: 8,
@@ -462,11 +489,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.5)',
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   chipText: {
-    fontSize: 12,
+    fontFamily: 'Demonized',
+    fontSize: 10,
     color: '#5DD62C',
     fontWeight: '600',
   },
@@ -492,6 +520,12 @@ const styles = StyleSheet.create({
   },
   avatarWrap: {
     marginBottom: 2,
+  },
+  avatarLetter: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#5DD62C',
+    fontFamily: 'Demonized',
   },
   messageBubble: {
     maxWidth: '82%',
@@ -530,7 +564,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     color: '#5DD62C',
     fontWeight: '700',
   },
@@ -544,9 +578,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   typingText: {
-    fontSize: 12,
+    fontFamily: 'Demonized',
+    fontSize: 11,
     color: '#5DD62C',
-    fontStyle: 'italic',
+    letterSpacing: 0.4,
   },
   listeningBanner: {
     flexDirection: 'row',

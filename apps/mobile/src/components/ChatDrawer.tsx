@@ -16,8 +16,8 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onToggle, liveTr
       <TouchableOpacity style={styles.header} activeOpacity={0.7} onPress={onToggle}>
         <View style={styles.handleBar} />
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Transcripción y Respuestas</Text>
-          <Text style={styles.headerAction}>{isOpen ? 'Ocultar ▼' : 'Mostrar ▲'}</Text>
+          <Text style={styles.headerTitle}>TRANCRIPCIÓN Y RESPUESTAS</Text>
+          <Text style={styles.headerAction}>{isOpen ? 'OCULTAR ▼' : 'MOSTRAR ▲'}</Text>
         </View>
       </TouchableOpacity>
 
@@ -25,7 +25,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onToggle, liveTr
         <View style={styles.body}>
           {liveTranscript ? (
             <View style={styles.liveBox}>
-              <Text style={styles.liveLabel}>En vivo:</Text>
+              <Text style={styles.liveLabel}>EN VIVO:</Text>
               <Text style={styles.liveText}>{liveTranscript}</Text>
             </View>
           ) : null}
@@ -41,7 +41,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onToggle, liveTr
               >
                 <View style={styles.metaRow}>
                   <Text style={styles.senderName}>
-                    {msg.sender === 'user' ? 'Tú' : msg.agent ? `Jack (${msg.agent})` : 'Jack'}
+                    {msg.sender === 'user' ? 'TÚ' : msg.agent ? `JACK (${msg.agent.toUpperCase()})` : 'JACK'}
                   </Text>
                   <Text style={styles.timestamp}>{msg.timestamp}</Text>
                 </View>
@@ -51,7 +51,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onToggle, liveTr
           </ScrollView>
 
           <TouchableOpacity style={styles.clearBtn} onPress={clearMessages}>
-            <Text style={styles.clearBtnText}>Limpiar Historial</Text>
+            <Text style={styles.clearBtnText}>LIMPIAR HISTORIAL</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#18181b',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#27272a',
+    borderColor: 'rgba(93, 214, 44, 0.4)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
@@ -86,13 +86,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
-    backgroundColor: '#27272a',
+    backgroundColor: '#202020',
   },
   handleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#71717a',
+    backgroundColor: '#5DD62C',
     marginBottom: 6,
   },
   headerRow: {
@@ -101,21 +101,24 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   headerTitle: {
-    color: '#f4f4f5',
-    fontWeight: '600',
-    fontSize: 13,
+    fontFamily: 'Demonized',
+    color: '#f8f8f8',
+    fontWeight: '700',
+    fontSize: 11,
+    letterSpacing: 0.5,
   },
   headerAction: {
-    color: '#3b82f6',
-    fontWeight: '500',
-    fontSize: 12,
+    fontFamily: 'Demonized',
+    color: '#5DD62C',
+    fontWeight: '700',
+    fontSize: 10,
   },
   body: {
     padding: 12,
     maxHeight: 320,
   },
   liveBox: {
-    backgroundColor: '#27272a',
+    backgroundColor: '#202020',
     padding: 8,
     borderRadius: 8,
     marginBottom: 8,
@@ -123,8 +126,9 @@ const styles = StyleSheet.create({
     borderLeftColor: '#ef4444',
   },
   liveLabel: {
+    fontFamily: 'Demonized',
     color: '#ef4444',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
   },
   liveText: {
@@ -144,12 +148,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   userMessage: {
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#337418',
+    borderWidth: 1,
+    borderColor: '#5DD62C',
     alignSelf: 'flex-end',
     maxWidth: '85%',
   },
   assistantMessage: {
-    backgroundColor: '#27272a',
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.4)',
     alignSelf: 'flex-start',
     maxWidth: '85%',
   },
@@ -159,13 +167,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   senderName: {
-    color: '#93c5fd',
-    fontSize: 11,
+    fontFamily: 'Demonized',
+    color: '#5DD62C',
+    fontSize: 10,
     fontWeight: 'bold',
   },
   timestamp: {
     color: '#a1a1aa',
-    fontSize: 10,
+    fontSize: 9,
   },
   messageText: {
     color: '#ffffff',
@@ -175,9 +184,16 @@ const styles = StyleSheet.create({
   clearBtn: {
     marginTop: 8,
     alignItems: 'center',
+    paddingVertical: 6,
+    backgroundColor: '#202020',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.3)',
   },
   clearBtnText: {
-    color: '#71717a',
-    fontSize: 11,
+    fontFamily: 'Demonized',
+    color: '#5DD62C',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

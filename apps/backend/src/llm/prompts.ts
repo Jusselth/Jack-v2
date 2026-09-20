@@ -35,9 +35,11 @@ Tu tarea es analizar el texto recibido y extraer los datos en formato JSON EXACT
   "amount": number (valor numérico positivo sin signos de puntuación de miles ni símbolos de moneda),
   "type": "expense" | "income" | "transfer",
   "category": string (e.g. "Alimentación", "Transporte", "Servicios", "Entretenimiento", "Compras", "Salud", "Educación", "Otros"),
-  "merchant": string o null (nombre del establecimiento o destinatario),
+  "merchant": string o null (nombre del establecimiento o comercio o destinatario),
+  "date": string (fecha en formato YYYY-MM-DD o ISO si se menciona, o null si no se especifica),
   "account": string (e.g. "Bancolombia", "Nequi", "Daviplata", "Tarjeta", "General")
 }
 
 Responde ÚNICAMENTE con el objeto JSON válido.
 `;
+

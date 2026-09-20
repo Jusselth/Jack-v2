@@ -72,8 +72,12 @@ export const useAssistant = () => {
   );
 
   const voiceEngine = useVoiceEngine((finalText) => {
-    handleAssistantResponse(finalText);
+    // Set the transcribed voice text in the global store and input field without auto-sending
+    if (finalText) {
+      useAppStore.getState().setTranscript(finalText);
+    }
   });
+
 
   const toggleListening = useCallback(() => {
     if (voiceEngine.state === 'listening') {
