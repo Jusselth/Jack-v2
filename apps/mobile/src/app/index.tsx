@@ -29,15 +29,12 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { state: voiceState, toggleListening } = useAssistant();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const mainScrollRef = useRef<ScrollView>(null);
 
-  // ── Animated orbital values ──────────────────────────────────────────────
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  const spinReverseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // 1. Orbital breathing
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -55,39 +52,27 @@ export default function HomeScreen() {
       ])
     ).start();
 
-    // 2. Orbital CW
-    Animated.loop(
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 24000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // 3. Orbital CCW
-    Animated.loop(
-      Animated.timing(spinReverseAnim, {
-        toValue: 1,
-        duration: 36000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    ).start();
-
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
+      (e) => {
         setIsKeyboardVisible(true);
+        if (e.endCoordinates?.height) {
+          setKeyboardHeight(e.endCoordinates.height);
+        }
         setTimeout(() => {
           mainScrollRef.current?.scrollToEnd({ animated: true });
-        }, 120);
+        }, 50);
+        setTimeout(() => {
+          mainScrollRef.current?.scrollToEnd({ animated: true });
+        }, 200);
       }
     );
+
     const hideSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
         setIsKeyboardVisible(false);
+        setKeyboardHeight(0);
       }
     );
 
@@ -97,13 +82,23 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
-  const spinReverse = spinReverseAnim.interpolate({ inputRange: [0, 1], outputRange: ['360deg', '0deg'] });
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      mainScrollRef.current?.scrollToEnd({ animated: true });
+    }, 60);
+    setTimeout(() => {
+      mainScrollRef.current?.scrollToEnd({ animated: true });
+    }, 220);
+  };
+
+  const headerTop = Math.max(insets.top + 8, 18);
+  const bottomNavBottom = Math.max(insets.bottom + 10, 18);
 
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? headerTop + 60 : 0}
     >
       <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" translucent />
 
@@ -117,53 +112,31 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.scrollContentContainer,
           {
-            paddingTop: Math.max(insets.top + 72, 80),
-            paddingBottom: isKeyboardVisible ? 20 : Math.max(insets.bottom + 90, 100),
+            paddingTop: isKeyboardVisible ? headerTop + 60 : headerTop + 85,
+            paddingBottom: isKeyboardVisible ? 120 : bottomNavBottom + 90,
           },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
       >
-        <View style={styles.coreContainer}>
-          {/* Outer orbital ring CW */}
-          <Animated.View style={[styles.orbitalOuterRing, { transform: [{ rotate: spin }] }]}>
-            <View style={[styles.marker, styles.markerTop]} />
-            <View style={[styles.marker, styles.markerBottom]} />
-            <View style={[styles.marker, styles.markerLeft]} />
-            <View style={[styles.marker, styles.markerRight]} />
-          </Animated.View>
-
-          {/* Inner dashed ring CCW */}
-          <Animated.View style={[styles.orbitalInnerDashed, { transform: [{ rotate: spinReverse }] }]} />
-
-          {/* Glowing Minimalist Pulse Core (DynamicOrb) */}
+        <View style={[styles.coreContainer, isKeyboardVisible && styles.coreContainerCompact]}>
+          {/* Glowing Siri-Style Dynamic Orb Hero */}
           <TouchableOpacity
             style={styles.orbCenterWrap}
             activeOpacity={0.85}
             onPress={toggleListening}
           >
-            <DynamicOrb state={voiceState} size={180} />
+            <DynamicOrb state={voiceState} size={isKeyboardVisible ? 90 : 160} />
           </TouchableOpacity>
-
-          {/* HUD coordinates */}
-          <View style={styles.coordsRow} pointerEvents="none">
-            <Text style={styles.coordCyanText}>090°</Text>
-            <Text style={styles.coordLavenderText}>270°</Text>
-          </View>
         </View>
 
         {/* ── CHAT SECTION ── */}
-        <ChatSection
-          onFocusInput={() => {
-            setTimeout(() => {
-              mainScrollRef.current?.scrollToEnd({ animated: true });
-            }, 150);
-          }}
-        />
+        <ChatSection onFocusInput={scrollToBottom} />
       </ScrollView>
 
       {/* ── FLOATING HEADER ── */}
-      <View style={[styles.floatingHeaderWrap, { top: Math.max(insets.top + 8, 18) }]}>
+      <View style={[styles.floatingHeaderWrap, { top: headerTop }]}>
         <HexBar
           height={62}
           fill="rgba(32, 32, 32, 0.95)"
@@ -184,15 +157,15 @@ export default function HomeScreen() {
               <MaterialCommunityIcons name="wifi" size={15} color="#5DD62C" style={styles.wifiIcon} />
             </View>
             <Hexagon size={34} fill="#337418" stroke="#5DD62C" strokeWidth={1.5}>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
+              <Text style={styles.headerAvatarLetter}>J</Text>
             </Hexagon>
           </View>
         </HexBar>
       </View>
 
-      {/* ── FLOATING BOTTOM NAV (Using router.replace for clean tab navigation) ── */}
+      {/* ── FLOATING BOTTOM NAV (Hidden automatically when keyboard is typing) ── */}
       {!isKeyboardVisible && (
-        <View style={[styles.floatingBottomNavWrap, { bottom: Math.max(insets.bottom + 10, 18) }]}>
+        <View style={[styles.floatingBottomNavWrap, { bottom: bottomNavBottom }]}>
           <HexBar
             height={76}
             fill="rgba(32, 32, 32, 0.95)"
@@ -218,14 +191,14 @@ export default function HomeScreen() {
                   <Hexagon
                     size={68}
                     fill="transparent"
-                    stroke={voiceState === 'listening' ? '#ef4444' : 'rgba(93, 214, 44, 0.7)'}
+                    stroke={voiceState === 'listening' ? '#ec4899' : 'rgba(93, 214, 44, 0.7)'}
                     strokeWidth={1.5}
                   />
                 </Animated.View>
                 <Hexagon
                   size={60}
-                  fill={voiceState === 'listening' ? '#ef4444' : '#337418'}
-                  stroke={voiceState === 'listening' ? '#ef4444' : 'rgba(93, 214, 44, 0.9)'}
+                  fill={voiceState === 'listening' ? '#ec4899' : '#337418'}
+                  stroke={voiceState === 'listening' ? '#ec4899' : 'rgba(93, 214, 44, 0.9)'}
                   strokeWidth={1.5}
                   style={styles.centerHexGlow}
                 >
@@ -267,10 +240,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#0f0f0f',
-    position: 'relative',
-    overflow: 'hidden',
   },
-
   scrollContainer: {
     flex: 1,
     zIndex: 10,
@@ -278,80 +248,26 @@ const styles = StyleSheet.create({
   scrollContentContainer: {
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: 16,
   },
   coreContainer: {
-    width: 320,
-    height: 320,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    backgroundColor: 'transparent',
-  },
-
-  // ORBITAL RINGS
-  orbitalOuterRing: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    borderWidth: 1.5,
-    borderColor: 'rgba(93, 214, 44, 0.3)',
-    backgroundColor: 'transparent',
-  },
-  marker: { position: 'absolute', borderRadius: 2, shadowOpacity: 1, shadowRadius: 8 },
-  markerTop: { top: -3, left: '50%', marginLeft: -5, width: 10, height: 4, backgroundColor: '#5DD62C', shadowColor: '#5DD62C' },
-  markerBottom: { bottom: -3, left: '50%', marginLeft: -5, width: 10, height: 4, backgroundColor: '#337418', shadowColor: '#337418' },
-  markerLeft: { left: -3, top: '50%', marginTop: -5, width: 4, height: 10, backgroundColor: '#5DD62C', shadowColor: '#5DD62C' },
-  markerRight: { right: -3, top: '50%', marginTop: -5, width: 4, height: 10, backgroundColor: '#337418', shadowColor: '#337418' },
-  orbitalInnerDashed: {
-    position: 'absolute',
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    borderWidth: 1.5,
-    borderColor: 'rgba(93, 214, 44, 0.4)',
-    borderStyle: 'dashed',
-    backgroundColor: 'transparent',
-  },
-
-  // ORB CENTER
-  orbCenterWrap: {
     width: 240,
     height: 240,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    marginVertical: 10,
+  },
+  coreContainerCompact: {
+    width: 100,
+    height: 100,
+    marginVertical: 4,
+  },
+  orbCenterWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 15,
-  },
-
-  // HUD COORDINATES
-  coordsRow: {
-    position: 'absolute',
-    width: 300,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    zIndex: 20,
-    backgroundColor: 'transparent',
-  },
-  coordCyanText: {
-    fontFamily: 'Demonized',
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#5DD62C',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(93, 214, 44, 0.8)',
-    textShadowRadius: 6,
-  },
-  coordLavenderText: {
-    fontFamily: 'Demonized',
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#f8f8f8',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(248, 248, 248, 0.8)',
-    textShadowRadius: 6,
   },
 
   // FLOATING HEADER
@@ -377,6 +293,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#f8f8f8',
     letterSpacing: 1.5,
+  },
+  headerAvatarLetter: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#5DD62C',
+    fontFamily: 'Demonized',
   },
   headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   latencyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -3,6 +3,8 @@ import {
   Animated,
   Dimensions,
   Easing,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -17,22 +19,33 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Hexagon, HexBar, HexPill } from '../components/Hexagon';
 import ParallaxDotBackground from '../components/ParallaxDotBackground';
-import { useAppStore, TaskItem as StoreTaskItem } from '../store/useAppStore';
+import { useAppStore, TaskItem } from '../store/useAppStore';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const CARD_HEIGHT = Math.min(500, Math.max(430, SCREEN_H * 0.55));
+const CARD_HEIGHT = Math.min(480, Math.max(400, SCREEN_H * 0.52));
 
 type TabKey = 'universidad' | 'personal';
 
 export default function PendientesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tasks, toggleTaskStatus, addTask } = useAppStore();
+  const { tasks, toggleTaskStatus, addTask, updateTask, deleteTask } = useAppStore();
 
   const [tab, setTab] = useState<TabKey>('universidad');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newSubject, setNewSubject] = useState('');
+
+  // Modal State for Create / Edit Task
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+
+  // Form Fields
+  const [formTitle, setFormTitle] = useState('');
+  const [formSubject, setFormSubject] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formPriority, setFormPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [formCategory, setFormCategory] = useState<'universidad' | 'personal'>('universidad');
+  const [formDueDate, setFormDueDate] = useState('Hoy');
+  const [formDueTime, setFormDueTime] = useState('23:59 hrs');
+  const [formAssignedTo, setFormAssignedTo] = useState('');
 
   const bounceAnim = useRef(new Animated.Value(0)).current;
 
@@ -64,22 +77,69 @@ export default function PendientesScreen() {
   const uniCount = tasks.filter((t) => (t.category || 'universidad') === 'universidad').length;
   const perCount = tasks.filter((t) => t.category === 'personal').length;
 
-  const handleCreateTask = () => {
-    if (!newTitle.trim()) return;
-    addTask({
-      subject: newSubject.trim() || (isUni ? 'Académico' : 'Personal'),
-      title: newTitle.trim(),
-      description: 'Tarea agregada al gestor de optimización Jack.',
-      priority: 'medium',
-      status: 'pending',
-      due_date: 'Hoy',
-      due_time: '23:59 hrs',
-      category: tab,
-      progress: 0.1,
-    });
-    setNewTitle('');
-    setNewSubject('');
-    setShowAddModal(false);
+  const openCreateModal = () => {
+    setEditingTaskId(null);
+    setFormTitle('');
+    setFormSubject(isUni ? 'Académico' : 'Personal');
+    setFormDescription('');
+    setFormPriority('medium');
+    setFormCategory(tab);
+    setFormDueDate('Hoy');
+    setFormDueTime('23:59 hrs');
+    setFormAssignedTo('');
+    setModalVisible(true);
+  };
+
+  const openEditModal = (task: TaskItem) => {
+    setEditingTaskId(task.id);
+    setFormTitle(task.title);
+    setFormSubject(task.subject || '');
+    setFormDescription(task.description || '');
+    setFormPriority(task.priority || 'medium');
+    setFormCategory(task.category || 'universidad');
+    setFormDueDate(task.due_date || 'Hoy');
+    setFormDueTime(task.due_time || '23:59 hrs');
+    setFormAssignedTo(task.assigned_to || '');
+    setModalVisible(true);
+  };
+
+  const handleSaveTask = () => {
+    if (!formTitle.trim()) return;
+
+    if (editingTaskId) {
+      updateTask(editingTaskId, {
+        title: formTitle.trim(),
+        subject: formSubject.trim() || (formCategory === 'universidad' ? 'Académico' : 'Personal'),
+        description: formDescription.trim(),
+        priority: formPriority,
+        category: formCategory,
+        due_date: formDueDate.trim() || 'Hoy',
+        due_time: formDueTime.trim() || '23:59 hrs',
+        assigned_to: formAssignedTo.trim() || 'Tú',
+      });
+    } else {
+      addTask({
+        title: formTitle.trim(),
+        subject: formSubject.trim() || (formCategory === 'universidad' ? 'Académico' : 'Personal'),
+        description: formDescription.trim() || 'Tarea agregada al gestor Jack.',
+        priority: formPriority,
+        status: 'pending',
+        category: formCategory,
+        due_date: formDueDate.trim() || 'Hoy',
+        due_time: formDueTime.trim() || '23:59 hrs',
+        assigned_to: formAssignedTo.trim() || 'Tú',
+        progress: 0.1,
+      });
+    }
+
+    setModalVisible(false);
+  };
+
+  const handleDeleteTask = () => {
+    if (editingTaskId) {
+      deleteTask(editingTaskId);
+      setModalVisible(false);
+    }
   };
 
   return (
@@ -122,7 +182,7 @@ export default function PendientesScreen() {
               <MaterialCommunityIcons name="wifi" size={15} color="#5DD62C" style={styles.wifiIcon} />
             </View>
             <Hexagon size={34} fill="#337418" stroke="#5DD62C" strokeWidth={1.5}>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#5DD62C', fontFamily: 'Demonized' }}>J</Text>
+              <Text style={styles.headerAvatarLetter}>J</Text>
             </Hexagon>
           </View>
         </HexBar>
@@ -171,48 +231,22 @@ export default function PendientesScreen() {
         </View>
       </View>
 
-      {/* Quick Add Bar */}
+      {/* Quick Add Button Bar */}
       <View style={styles.addBarRow}>
-        {showAddModal ? (
-          <View style={styles.addInputContainer}>
-            <TextInput
-              style={styles.addInput}
-              placeholder="Asignatura / Categoría..."
-              placeholderTextColor="#71717a"
-              value={newSubject}
-              onChangeText={setNewSubject}
-            />
-            <TextInput
-              style={[styles.addInput, { flex: 2 }]}
-              placeholder="Título de la tarea..."
-              placeholderTextColor="#71717a"
-              value={newTitle}
-              onChangeText={setNewTitle}
-              onSubmitEditing={handleCreateTask}
-            />
-            <TouchableOpacity style={styles.confirmAddBtn} onPress={handleCreateTask}>
-              <MaterialIcons name="check" size={18} color="#0f0f0f" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelAddBtn} onPress={() => setShowAddModal(false)}>
-              <MaterialIcons name="close" size={18} color="#ef4444" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.openAddBtn}
-            activeOpacity={0.8}
-            onPress={() => setShowAddModal(true)}
-          >
-            <MaterialIcons name="add" size={18} color="#5DD62C" />
-            <Text style={styles.openAddText}>Nueva Tarea {isUni ? 'Universitaria' : 'Personal'}</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.openAddBtn}
+          activeOpacity={0.8}
+          onPress={openCreateModal}
+        >
+          <MaterialIcons name="add" size={20} color="#5DD62C" />
+          <Text style={styles.openAddText}>+ Nueva Tarea ({isUni ? 'Universidad' : 'Personal'})</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Scroll hint */}
       {filteredTasks.length > 0 && (
         <View style={styles.hintRow}>
-          <Text style={styles.hintText}>Desliza abajo</Text>
+          <Text style={styles.hintText}>Toca cualquier tarjeta para editarla</Text>
           <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
             <MaterialIcons name="south" size={14} color="#5DD62C" />
           </Animated.View>
@@ -224,11 +258,9 @@ export default function PendientesScreen() {
         style={styles.taskScroll}
         contentContainerStyle={[
           styles.taskScrollContent,
-          { paddingBottom: bottomNavBottom + 100 },
+          { paddingBottom: bottomNavBottom + 110 },
         ]}
         showsVerticalScrollIndicator={false}
-        snapToInterval={CARD_HEIGHT + 24}
-        decelerationRate="fast"
       >
         {filteredTasks.length === 0 ? (
           <View style={styles.emptyStateContainer}>
@@ -237,7 +269,7 @@ export default function PendientesScreen() {
             </Hexagon>
             <Text style={styles.emptyTitle}>No hay tareas pendientes</Text>
             <Text style={styles.emptySubtitle}>
-              Todas tus tareas en {isUni ? 'Universidad' : 'Personal'} están al día. Toca "Nueva Tarea" o pídele a Jack por voz.
+              Todas tus tareas en {isUni ? 'Universidad' : 'Personal'} están al día. Toca "+ Nueva Tarea" para crear una.
             </Text>
           </View>
         ) : (
@@ -246,13 +278,14 @@ export default function PendientesScreen() {
             const progressVal = task.progress ?? (isCompleted ? 1 : 0.3);
 
             return (
-              <View
+              <TouchableOpacity
                 key={task.id}
                 style={[
                   styles.taskCard,
-                  { height: CARD_HEIGHT },
                   isCompleted && styles.taskCardCompleted,
                 ]}
+                activeOpacity={0.92}
+                onPress={() => openEditModal(task)}
               >
                 <View style={styles.cardGlowTop} />
 
@@ -298,7 +331,7 @@ export default function PendientesScreen() {
                   <View style={styles.remainingRow}>
                     <View style={styles.remainingLeft}>
                       <MaterialIcons name="schedule" size={16} color="#5DD62C" />
-                      <Text style={styles.remainingLabel}>Tiempo Límite:</Text>
+                      <Text style={styles.remainingLabel}>Límite de Entrega:</Text>
                     </View>
                     <HexPill
                       fill="#202020"
@@ -347,7 +380,10 @@ export default function PendientesScreen() {
                       isCompleted ? styles.actionCompleted : styles.actionPending,
                     ]}
                     activeOpacity={0.85}
-                    onPress={() => toggleTaskStatus(task.id)}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      toggleTaskStatus(task.id);
+                    }}
                   >
                     <MaterialIcons
                       name={isCompleted ? 'check-circle' : 'radio-button-unchecked'}
@@ -363,14 +399,173 @@ export default function PendientesScreen() {
                       {isCompleted ? 'Reabrir Tarea' : 'Marcar Entregada'}
                     </Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.editCardBtn}
+                    activeOpacity={0.8}
+                    onPress={() => openEditModal(task)}
+                  >
+                    <MaterialIcons name="edit" size={18} color="#5DD62C" />
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
-      {/* ── FLOATING BOTTOM DOCK (Using router.replace for clean tab navigation) ── */}
+      {/* ── TASK CREATION / EDIT MODAL ── */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingTaskId ? 'EDITAR PENDIENTE' : 'NUEVO PENDIENTE'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialIcons name="close" size={22} color="#f8f8f8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalFormContent}>
+              {/* Category selector */}
+              <Text style={styles.inputLabel}>CATEGORÍA</Text>
+              <View style={styles.categoryPillsRow}>
+                <TouchableOpacity
+                  style={[styles.categoryPill, formCategory === 'universidad' && styles.categoryPillActive]}
+                  onPress={() => setFormCategory('universidad')}
+                >
+                  <MaterialIcons name="school" size={16} color={formCategory === 'universidad' ? '#0f0f0f' : '#5DD62C'} />
+                  <Text style={[styles.categoryPillText, formCategory === 'universidad' && styles.categoryPillTextActive]}>
+                    Universidad
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.categoryPill, formCategory === 'personal' && styles.categoryPillActive]}
+                  onPress={() => setFormCategory('personal')}
+                >
+                  <MaterialIcons name="person" size={16} color={formCategory === 'personal' ? '#0f0f0f' : '#5DD62C'} />
+                  <Text style={[styles.categoryPillText, formCategory === 'personal' && styles.categoryPillTextActive]}>
+                    Personal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Title */}
+              <Text style={styles.inputLabel}>TÍTULO DE LA TAREA *</Text>
+              <TextInput
+                style={styles.textInputField}
+                placeholder="Ej. Entregar proyecto de Inteligencia Artificial..."
+                placeholderTextColor="#71717a"
+                value={formTitle}
+                onChangeText={setFormTitle}
+              />
+
+              {/* Subject */}
+              <Text style={styles.inputLabel}>ASIGNATURA O TÓPICO</Text>
+              <TextInput
+                style={styles.textInputField}
+                placeholder="Ej. Redes de Computadores / Finanzas"
+                placeholderTextColor="#71717a"
+                value={formSubject}
+                onChangeText={setFormSubject}
+              />
+
+              {/* Description */}
+              <Text style={styles.inputLabel}>DESCRIPCIÓN DETALLADA</Text>
+              <TextInput
+                style={[styles.textInputField, styles.textAreaField]}
+                placeholder="Escribe las especificaciones o notas clave..."
+                placeholderTextColor="#71717a"
+                value={formDescription}
+                onChangeText={setFormDescription}
+                multiline
+                numberOfLines={3}
+              />
+
+              {/* Priority */}
+              <Text style={styles.inputLabel}>PRIORIDAD</Text>
+              <View style={styles.priorityRow}>
+                {(['low', 'medium', 'high', 'urgent'] as const).map((p) => {
+                  const labels = { low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente' };
+                  const isSelected = formPriority === p;
+                  return (
+                    <TouchableOpacity
+                      key={p}
+                      style={[styles.priorityPill, isSelected && styles.priorityPillActive]}
+                      onPress={() => setFormPriority(p)}
+                    >
+                      <Text style={[styles.priorityText, isSelected && styles.priorityTextActive]}>
+                        {labels[p]}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Date & Time */}
+              <View style={styles.dateTimeGrid}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>FECHA</Text>
+                  <TextInput
+                    style={styles.textInputField}
+                    placeholder="Hoy / 28 Oct"
+                    placeholderTextColor="#71717a"
+                    value={formDueDate}
+                    onChangeText={setFormDueDate}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>HORA</Text>
+                  <TextInput
+                    style={styles.textInputField}
+                    placeholder="23:59 hrs"
+                    placeholderTextColor="#71717a"
+                    value={formDueTime}
+                    onChangeText={setFormDueTime}
+                  />
+                </View>
+              </View>
+
+              {/* Assigned To */}
+              <Text style={styles.inputLabel}>RESPONSABLE / PROFESOR</Text>
+              <TextInput
+                style={styles.textInputField}
+                placeholder="Ej. Ing. Carlos / En solitario"
+                placeholderTextColor="#71717a"
+                value={formAssignedTo}
+                onChangeText={setFormAssignedTo}
+              />
+
+              {/* Buttons */}
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity style={styles.modalSaveBtn} activeOpacity={0.85} onPress={handleSaveTask}>
+                  <MaterialIcons name="check" size={20} color="#0f0f0f" />
+                  <Text style={styles.modalSaveText}>{editingTaskId ? 'GUARDAR CAMBIOS' : 'CREAR PENDIENTE'}</Text>
+                </TouchableOpacity>
+
+                {editingTaskId && (
+                  <TouchableOpacity style={styles.modalDeleteBtn} activeOpacity={0.85} onPress={handleDeleteTask}>
+                    <MaterialIcons name="delete-outline" size={20} color="#ef4444" />
+                    <Text style={styles.modalDeleteText}>ELIMINAR</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── FLOATING BOTTOM DOCK ── */}
       <View style={[styles.bottomDockWrap, { bottom: bottomNavBottom }]}>
         <HexBar
           height={80}
@@ -401,7 +596,7 @@ export default function PendientesScreen() {
                 </Hexagon>
               </View>
             </View>
-            <Text style={styles.navLabelActive}>Pendientes</Text>
+            <Text style={styles.navLabelActive}>PENDIENTES</Text>
           </View>
 
           <TouchableOpacity
@@ -412,7 +607,7 @@ export default function PendientesScreen() {
             <Hexagon size={42} fill="#202020" stroke="rgba(93, 214, 44, 0.4)">
               <MaterialIcons name="graphic-eq" size={20} color="#5DD62C" />
             </Hexagon>
-            <Text style={styles.navLabel}>Asistente</Text>
+            <Text style={styles.navLabel}>ASISTENTE</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -423,7 +618,7 @@ export default function PendientesScreen() {
             <Hexagon size={42} fill="#202020" stroke="rgba(93, 214, 44, 0.4)">
               <MaterialIcons name="account-balance-wallet" size={20} color="#5DD62C" />
             </Hexagon>
-            <Text style={styles.navLabel}>Cuentas</Text>
+            <Text style={styles.navLabel}>CUENTAS</Text>
           </TouchableOpacity>
         </HexBar>
       </View>
@@ -462,6 +657,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#f8f8f8',
     letterSpacing: 1.5,
+  },
+  headerAvatarLetter: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#5DD62C',
+    fontFamily: 'Demonized',
   },
   headerRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   latencyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -531,12 +732,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: '#202020',
     borderWidth: 1,
-    borderColor: 'rgba(93, 214, 44, 0.4)',
+    borderColor: '#5DD62C',
     borderRadius: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    shadowColor: '#5DD62C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   openAddText: {
     fontFamily: 'Demonized',
@@ -544,34 +750,7 @@ const styles = StyleSheet.create({
     color: '#5DD62C',
     fontWeight: '700',
     textTransform: 'uppercase',
-  },
-  addInputContainer: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  addInput: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#202020',
-    borderWidth: 1,
-    borderColor: '#5DD62C',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    color: '#f8f8f8',
-    fontSize: 12,
-  },
-  confirmAddBtn: {
-    backgroundColor: '#5DD62C',
-    padding: 8,
-    borderRadius: 8,
-  },
-  cancelAddBtn: {
-    backgroundColor: '#202020',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    padding: 8,
-    borderRadius: 8,
+    letterSpacing: 0.6,
   },
 
   hintRow: {
@@ -580,11 +759,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
   },
   hintText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     color: 'rgba(93, 214, 44, 0.85)',
   },
@@ -596,7 +775,7 @@ const styles = StyleSheet.create({
   taskScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    gap: 20,
+    gap: 16,
   },
 
   emptyStateContainer: {
@@ -626,18 +805,18 @@ const styles = StyleSheet.create({
 
   taskCard: {
     width: '100%',
-    borderRadius: 24,
+    borderRadius: 22,
     backgroundColor: 'rgba(32, 32, 32, 0.95)',
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.5)',
-    padding: 20,
-    justifyContent: 'space-between',
+    padding: 18,
+    gap: 12,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.55,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    elevation: 10,
   },
   taskCardCompleted: {
     opacity: 0.65,
@@ -656,12 +835,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
     gap: 8,
   },
   subjectText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
@@ -669,19 +848,19 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.4,
     color: '#f8f8f8',
   },
   taskTitle: {
     fontFamily: 'Demonized',
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#f8f8f8',
-    lineHeight: 24,
+    lineHeight: 22,
     letterSpacing: -0.3,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   textCompleted: {
     textDecorationLine: 'line-through',
@@ -694,11 +873,11 @@ const styles = StyleSheet.create({
   },
   metaModule: {
     backgroundColor: '#202020',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.3)',
     padding: 12,
-    gap: 10,
+    gap: 8,
   },
   remainingRow: {
     flexDirection: 'row',
@@ -712,17 +891,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   remainingLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#f8f8f8',
   },
   remainingValue: {
     fontFamily: 'Demonized',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#5DD62C',
   },
   progressTrack: {
-    height: 6,
+    height: 5,
     borderRadius: 3,
     backgroundColor: '#0f0f0f',
     borderWidth: 1,
@@ -740,44 +919,45 @@ const styles = StyleSheet.create({
   metaCell: {
     flex: 1,
     padding: 8,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: '#202020',
     borderWidth: 1,
     borderColor: 'rgba(93, 214, 44, 0.25)',
   },
   metaLabel: {
     fontFamily: 'Demonized',
-    fontSize: 9,
+    fontSize: 8,
     color: '#5DD62C',
     textTransform: 'uppercase',
     letterSpacing: 0.7,
     marginBottom: 2,
   },
   metaValue: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#f8f8f8',
   },
   metaValueMono: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#5DD62C',
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 4,
+    gap: 8,
+    paddingTop: 2,
   },
   primaryAction: {
     flex: 1,
-    height: 42,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 10,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   actionPending: {
     backgroundColor: '#5DD62C',
@@ -789,64 +969,233 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     fontFamily: 'Demonized',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
+  editCardBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
+  // MODAL STYLES
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxHeight: '90%',
+    backgroundColor: 'rgba(28, 28, 28, 0.98)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#5DD62C',
+    padding: 20,
+    shadowColor: '#5DD62C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(93, 214, 44, 0.25)',
+  },
+  modalTitle: {
+    fontFamily: 'Demonized',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#5DD62C',
+    letterSpacing: 1,
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalFormContent: {
+    paddingVertical: 12,
+    gap: 8,
+  },
+  inputLabel: {
+    fontFamily: 'Demonized',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#5DD62C',
+    letterSpacing: 0.6,
+    marginTop: 6,
+  },
+  textInputField: {
+    backgroundColor: '#181818',
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#f8f8f8',
+    fontSize: 13,
+  },
+  textAreaField: {
+    minHeight: 65,
+    textAlignVertical: 'top',
+  },
+  categoryPillsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  categoryPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.4)',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  categoryPillActive: {
+    backgroundColor: '#5DD62C',
+    borderColor: '#5DD62C',
+  },
+  categoryPillText: {
+    fontFamily: 'Demonized',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#5DD62C',
+  },
+  categoryPillTextActive: {
+    color: '#0f0f0f',
+  },
+  priorityRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  priorityPill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: 'rgba(93, 214, 44, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 6,
+  },
+  priorityPillActive: {
+    backgroundColor: 'rgba(93, 214, 44, 0.3)',
+    borderColor: '#5DD62C',
+  },
+  priorityText: {
+    fontFamily: 'Demonized',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#f8f8f8',
+  },
+  priorityTextActive: {
+    color: '#5DD62C',
+  },
+  dateTimeGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalActionRow: {
+    marginTop: 14,
+    gap: 8,
+  },
+  modalSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#5DD62C',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  modalSaveText: {
+    fontFamily: 'Demonized',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f0f0f',
+    letterSpacing: 0.8,
+  },
+  modalDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#202020',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  modalDeleteText: {
+    fontFamily: 'Demonized',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ef4444',
+    letterSpacing: 0.8,
+  },
+
+  // BOTTOM DOCK
   bottomDockWrap: {
     position: 'absolute',
     left: 12,
     right: 12,
     zIndex: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.7,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.65,
     shadowRadius: 20,
-    elevation: 16,
+    elevation: 14,
   },
-  bottomDockContent: {
-    justifyContent: 'space-between',
-  },
-  navItemActiveWrap: {
-    alignItems: 'center',
-    gap: 4,
-  },
+  bottomDockContent: { justifyContent: 'space-around' },
+  navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 64, gap: 3 },
+  navItemActiveWrap: { alignItems: 'center', minWidth: 64, marginTop: -24 },
   navActiveWrap: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    width: 60,
+    height: 60,
   },
   navBadgePos: {
     position: 'absolute',
-    top: -4,
-    right: -6,
+    top: -2,
+    right: -2,
   },
   navBadgeText: {
     fontFamily: 'Demonized',
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 8,
+    fontWeight: '900',
     color: '#0f0f0f',
-  },
-  navLabelActive: {
-    fontFamily: 'Demonized',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-    color: '#5DD62C',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
   },
   navLabel: {
     fontFamily: 'Demonized',
-    fontSize: 10,
-    fontWeight: '500',
+    fontSize: 9,
+    fontWeight: '700',
     color: '#5DD62C',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  navLabelActive: {
+    fontFamily: 'Demonized',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#f8f8f8',
+    letterSpacing: 1,
+    marginTop: 2,
   },
 });

@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   balanceStat: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1, justifyContent: 'center' },
-  balanceStatLabel: { fontSize: 10, color: '#f8f8f8', fontWeight: '500' },
+  balanceStatLabel: { fontFamily: 'Demonized', fontSize: 9, color: '#f8f8f8', fontWeight: '500' },
   balanceStatValue: { fontFamily: 'Demonized', fontSize: 11, fontWeight: '700' },
   balanceStatDivider: { width: 1, height: 14, backgroundColor: 'rgba(93, 214, 44, 0.3)' },
 
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(93, 214, 44, 0.3)',
     marginBottom: 12,
   },
-  personAmountLabel: { fontSize: 11, color: '#f8f8f8' },
+  personAmountLabel: { fontFamily: 'Demonized', fontSize: 10, color: '#f8f8f8' },
   personAmountValue: {
     fontFamily: 'Demonized',
     fontSize: 13,

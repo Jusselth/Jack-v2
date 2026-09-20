@@ -11,6 +11,14 @@ LogBox.ignoreLogs([
   'Unsupported top level event type "topSvgLayout" dispatched',
 ]);
 
+const originalConsoleError = console.error;
+console.error = (...args: any[]) => {
+  const msg = args[0];
+  if (typeof msg === 'string' && msg.includes('topSvgLayout')) return;
+  if (msg instanceof Error && msg.message?.includes('topSvgLayout')) return;
+  originalConsoleError(...args);
+};
+
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
