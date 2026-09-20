@@ -9,14 +9,20 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
     "@supabase/supabase-js": "^2.49.1",
     "axios": "^1.8.1",
+    "buffer": "^6.0.3",
     "expo": "~57.0.24",
+    "expo-audio": "^57.0.5",
     "expo-constants": "~18.0.8",
+    "expo-font": "^57.0.4",
     "expo-linking": "~8.0.7",
     "expo-router": "~6.0.17",
+    "expo-sensors": "^57.0.3",
     "expo-speech": "~14.0.5",
     "expo-speech-recognition": "^3.0.0",
+    "expo-splash-screen": "^57.0.9",
     "expo-status-bar": "~57.0.1",
     "nativewind": "^4.1.23",
     "react": "19.2.3",
@@ -32,6 +38,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.26.9",
+    "@expo/ngrok": "^4.1.0",
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },

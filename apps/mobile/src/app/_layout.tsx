@@ -1,57 +1,53 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { Text } from 'react-native';
-import '../../global.css';
+import { Buffer } from 'buffer';
+(globalThis as any).Buffer = (globalThis as any).Buffer || Buffer;
+
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import { LogBox, StatusBar } from 'react-native';
+
+LogBox.ignoreLogs([
+  'Unsupported top level event type "topSvgLayout" dispatched',
+]);
+
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    Demonized: require('../../assets/fonts/Demonized.ttf'),
+  });
+
+  useEffect(() => {
+    if (loaded || error) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, error]);
+
+  if (!loaded && !error) {
+    return null;
+  }
+
   return (
     <>
-      <StatusBar style="light" />
-      <Tabs
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#09090b',
-          },
-          headerTintColor: '#f4f4f5',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          tabBarStyle: {
-            backgroundColor: '#09090b',
-            borderTopColor: '#27272a',
-            height: 60,
-            paddingBottom: 8,
-          },
-          tabBarActiveTintColor: '#3b82f6',
-          tabBarInactiveTintColor: '#71717a',
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Jack Orb',
-            headerTitle: 'Jack AI Assistant',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>🎙️</Text>,
-          }}
-        />
-        <Tabs.Screen
+      <StatusBar barStyle="light-content" backgroundColor="#0f0f0f" />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen
           name="pendientes"
           options={{
-            title: 'Pendientes',
-            headerTitle: 'Agenda & Tareas',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>📝</Text>,
+            animation: 'slide_from_left',
+            gestureDirection: 'horizontal',
           }}
         />
-        <Tabs.Screen
+        <Stack.Screen
           name="cuentas"
           options={{
-            title: 'Cuentas',
-            headerTitle: 'Finanzas & Cuentas',
-            tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>💳</Text>,
+            animation: 'slide_from_right',
+            gestureDirection: 'horizontal',
           }}
         />
-      </Tabs>
+      </Stack>
     </>
   );
 }
